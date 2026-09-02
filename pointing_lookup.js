@@ -1,15 +1,14 @@
 /**
- * Comparación entre el punto de pointing (xn, yn — normalizado [0,1] sobre
- * el plano rectificado, el mismo que produce BoardGrounding.project() en
- * src/modules/grounding/grounding.js) y las cajas detectadas por Gemini
- * para la diapositiva activa (precalculadas por batch_analyze.py).
+ * Comparación entre un punto de pointing (xn, yn — normalizado [0,1] sobre
+ * la diapositiva, venga de donde venga: cámara calibrada, clic de ratón,
+ * puntero…) y las cajas detectadas por Gemini para la diapositiva activa
+ * (precalculadas por batch_analyze.py / serve_visual_test.py).
  *
- * Estabiliza el resultado en el tiempo con el mismo patrón de debounce que
- * ya usa BoardGrounding para la rejilla 3x3 (_pendingRegion/_pendingRegionCount,
- * por defecto 5 frames consecutivos antes de confirmar un cambio).
+ * Estabiliza el resultado en el tiempo con debounce: exige N frames
+ * consecutivos con el mismo resultado antes de confirmar un cambio.
  */
 
-const ELEMENT_CHANGE_FRAMES = 5; // mismo valor por defecto que REGION_CHANGE_FRAMES
+const ELEMENT_CHANGE_FRAMES = 5; // frames consecutivos por defecto antes de confirmar un cambio
 
 /**
  * Encuentra la detección cuya caja contiene el punto (xn, yn).

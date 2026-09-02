@@ -1,9 +1,6 @@
 """
-Sirve visual_test.html y expone /predict para analizar en vivo las
-diapositivas que el usuario suba desde el navegador (además de las 3 de
-ejemplo ya precalculadas en analisis_ppt.json).
-
-Mismo prompt y clases que dataset_slide_detection/gemini_detection/serve_gemini.py.
+Sirve visual_test.html y expone /predict para analizar en vivo, con Gemini,
+las diapositivas que el usuario suba desde el navegador.
 
 Usa Vertex AI: necesitas un proyecto de Google Cloud con la API de Vertex AI
 habilitada y `gcloud auth application-default login` hecho. El proyecto se

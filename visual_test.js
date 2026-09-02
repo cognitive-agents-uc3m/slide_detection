@@ -3,7 +3,7 @@ import { PointingIntervalLogger } from './interval_logger.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const PDF_RENDER_SCALE = 2; // ~150dpi, mismo valor "Media" que dataset_slide_detection
+const PDF_RENDER_SCALE = 2; // ~150dpi ("Media"), suficiente para que Gemini lea bien el texto
 
 const CLASS_COLORS = {
   'Title': '#4477EE', 'Heading': '#2255CC', 'Description': '#6699FF', 'Enumeration': '#33AAFF',

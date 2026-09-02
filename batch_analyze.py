@@ -4,9 +4,6 @@ unico con las detecciones de Nivel 1 por diapositiva (indexadas 0..N-1 en
 el orden alfabetico de los ficheros), listo para consultar en tiempo real
 sin volver a llamar a Gemini durante la clase.
 
-Mismo prompt y clases que dataset_slide_detection/gemini_detection/serve_gemini.py
-(ver ese repositorio para la justificacion completa de cada eleccion).
-
 Usa Vertex AI: necesitas un proyecto de Google Cloud con la API de Vertex AI
 habilitada y `gcloud auth application-default login` hecho. El proyecto se
 lee de GEMINI_PROJECT_ID (ver .env.example) — no hay ninguno cableado aqui.

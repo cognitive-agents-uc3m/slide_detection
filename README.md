@@ -1,76 +1,55 @@
-# slide_detection — análisis por lotes + comparación de pointing
+# slide_detection — detección de elementos en diapositivas con Gemini
 
-Prototipo del pipeline "PPT conocido de antemano" que evita la latencia de
-Gemini en tiempo real: se analiza toda la presentación **antes** de la
-clase, y durante la clase solo se hace una comparación geométrica barata
-contra el resultado ya calculado.
+Analiza las diapositivas de una presentación con Gemini (Vertex AI) y devuelve, para cada
+una, las cajas normalizadas `[0,1]²` de sus elementos (título, tabla, diagrama, código…).
+Pensado para precalcularse **antes** de una clase o charla, de forma que averiguar a qué
+elemento apunta alguien en directo sea después solo una comparación geométrica barata (punto
+contra cajas), sin volver a llamar a Gemini en tiempo real.
 
-Cubre las **fases 1 y 2** de ese pipeline (análisis por lotes + lógica de
-comparación), verificadas de verdad con llamadas reales a Gemini y pruebas
-automáticas. **No** incluye la fase 3 (captura de cámara + calibración +
-pose/manos en vivo) — esa parte reutilizaría tal cual los módulos ya
-existentes en `src/modules/` (ver más abajo cómo encajaría).
-
-**Nivel 2 incluido**: cuando el Nivel 1 detecta `Diagram`/`Chart`, se recorta
-esa región y se reclasifica contra las 28 categorías de DocFigure (ver
-justificación completa en `dataset_slide_detection/gemini_detection/NIVEL1.md`).
-Cada detección puede traer un campo `nivel2` además de `class`/`box`.
+**Nivel 2 incluido**: cuando el Nivel 1 detecta `Diagram`/`Chart`, recorta esa región y la
+reclasifica contra las 28 categorías del dataset DocFigure (Jobin, Mondal y Jawahar, ICDARW
+2019) — ver la lista completa y el prompt en `batch_analyze.py` / `serve_visual_test.py`. Cada
+detección puede traer un campo `nivel2` además de `class`/`box`.
 
 ## Contenido
 
-- **`batch_analyze.py`** — recorre una carpeta de imágenes de diapositivas
-  (ya convertidas desde el PPT/PDF, con el conversor de `dataset_slide_detection/`)
-  y llama a Gemini una vez por diapositiva, guardando todo en un único
-  `analisis_ppt.json`. Mismo prompt y las mismas 16 clases que
-  `dataset_slide_detection/gemini_detection/serve_gemini.py` — ver ese
-  repositorio (`NIVEL1.md`) para la justificación completa del prompt y de
-  por qué esas 16 clases.
-- **`pointing_lookup.js`** — la lógica que se ejecutaría en el navegador
-  durante la clase:
-  - `findPointedElement(xn, yn, detections)` — punto contra cajas, con
-    desempate por área menor cuando hay solape (pasa con frecuencia en las
-    detecciones de Gemini, comprobado con datos reales en las pruebas).
-  - `PointedElementTracker` — estabiliza el resultado en el tiempo con el
-    mismo patrón de *debounce* que ya usa `BoardGrounding` para la rejilla
-    3×3 (`REGION_CHANGE_FRAMES`, 5 frames por defecto).
-- **`test_pointing_lookup.mjs`** — pruebas con datos sintéticos (esta carpeta
-  no distribuye imágenes de diapositivas ni ningún `analisis_ppt.json`): las
-  cajas usadas reproducen patrones reales observados con Gemini durante el
-  desarrollo (solapes, desempates). Comprueba puntos dentro/fuera de caja, el
-  desempate por área menor, y el comportamiento del debounce frame a frame.
-  `node test_pointing_lookup.mjs` para ejecutarlas.
-- **`interval_logger.js`** — `PointingIntervalLogger`: colapsa el flujo
-  frame a frame del elemento estabilizado en intervalos `[inicio, fin]` por
-  diapositiva/elemento, y los exporta a CSV. Pensado para entregarle a un
-  módulo externo (p.ej. el de detección de deixis por voz de un compañero)
-  "de aquí a aquí se señalaba esto", en vez de un log crudo a 30fps. El
-  origen de los timestamps es el que tú decidas al llamar a `update()` —
-  hay que acordarlo con quien vaya a cruzar este fichero con el suyo, o los
-  intervalos no se alinearán con nada.
-- **`test_interval_logger.mjs`** — pruebas del logger de intervalos, con
-  datos sintéticos, incluida una integración con `PointedElementTracker`
-  simulando una sesión completa. `node test_interval_logger.mjs`.
-- **`visual_test.html` / `visual_test.js` / `visual_test.css`** — prueba
-  visual e interactiva (sin terminal). **No trae ninguna diapositiva
-  precargada** — arranca vacía, con un aviso de "sube tus propias
-  diapositivas". Botón **"↑ Subir mis propias diapositivas"** — acepta
-  imágenes sueltas o un PDF completo (se convierte a una imagen por página
-  en el propio navegador), y cada una se analiza en vivo con Gemini. Una vez
-  cargadas, navega entre ellas, haz clic para simular dónde apunta el dedo,
-  y observa en vivo el resultado bruto vs. el estabilizado (con la barra de
-  progreso del debounce). Usa `pointing_lookup.js` directamente, sin
-  duplicar la lógica. Botón **"↓ Descargar CSV de intervalos"** — usa
-  `PointingIntervalLogger` en vivo mientras haces clic por las diapositivas,
-  y descarga el CSV con los intervalos de esa sesión de prueba.
-- **`serve_visual_test.py`** — servidor que sirve `visual_test.html` y
-  expone `/predict` para analizar en vivo las diapositivas que subas desde
-  el navegador. Imprescindible ahora — sin él la página no tiene forma de
-  cargar ninguna diapositiva.
+- **`batch_analyze.py`** — recorre una carpeta de imágenes de diapositivas (ya convertidas
+  desde el PDF/PPT a PNG/JPG, una por página) y llama a Gemini una vez por diapositiva,
+  guardando todo en un único `analisis_ppt.json`.
+- **`serve_visual_test.py`** — servidor Flask que sirve `visual_test.html` y expone
+  `/predict`, para analizar en vivo desde el navegador las diapositivas que subas.
+- **`visual_test.html` / `visual_test.js` / `visual_test.css`** — prueba visual e interactiva
+  (sin terminal). Arranca vacía, con un botón **"↑ Subir mis propias diapositivas"** que acepta
+  imágenes sueltas o un PDF completo (convertido a una imagen por página en el propio
+  navegador); cada una se analiza en vivo con Gemini. Una vez cargadas, navega entre ellas, haz
+  clic para simular dónde apunta el dedo, y observa en vivo el resultado bruto vs. el
+  estabilizado (con barra de progreso del debounce). Botón **"↓ Descargar CSV de
+  intervalos"** para bajarte el registro de esa sesión de prueba.
+- **`pointing_lookup.js`** — la lógica que se ejecutaría en el navegador durante la clase:
+  - `findPointedElement(xn, yn, detections)` — punto contra cajas, con desempate por área
+    menor cuando hay solape (pasa con frecuencia en las detecciones de Gemini).
+  - `PointedElementTracker` — estabiliza el resultado en el tiempo, exigiendo N frames
+    consecutivos con el mismo resultado antes de confirmar un cambio (debounce, 5 frames por
+    defecto), para no parpadear cuando el punto ronda un borde entre dos cajas.
+- **`interval_logger.js`** — `PointingIntervalLogger`: colapsa el flujo frame a frame del
+  elemento estabilizado en intervalos `[inicio, fin]` por diapositiva/elemento, y los exporta a
+  CSV. Pensado para entregarle a un módulo externo (p. ej. una detección de deixis por voz)
+  "de aquí a aquí se señalaba esto", en vez de un log crudo a 30 fps. El origen de los
+  timestamps es el que decidas al llamar a `update()` — hay que acordarlo con quien vaya a
+  cruzar este fichero con el suyo, o los intervalos no se alinearán con nada.
+- **`test_pointing_lookup.mjs`** / **`test_interval_logger.mjs`** — pruebas con datos
+  sintéticos (esta carpeta no distribuye imágenes de diapositivas ni ningún
+  `analisis_ppt.json`); las cajas usadas reproducen patrones reales observados con Gemini
+  durante el desarrollo (solapes, desempates). `node test_pointing_lookup.mjs` /
+  `node test_interval_logger.mjs` para ejecutarlas.
+
+## Requisitos
+
+- Python 3.10+ y Node.js (solo para las pruebas `.mjs`).
+- Un proyecto de **Google Cloud** con la **API de Vertex AI** habilitada, y el SDK de
+  `gcloud` instalado y autenticado localmente.
 
 ## Cómo probarlo
-
-Requiere un proyecto de **Google Cloud** con la **API de Vertex AI** habilitada. Configúralo
-una vez:
 
 ```bash
 pip install -r requirements.txt
@@ -94,58 +73,50 @@ node test_pointing_lookup.mjs
 node test_interval_logger.mjs
 ```
 
-## Cómo encajaría con la cámara en vivo (fase 3, no incluida aquí)
+## Cómo encajaría con una captura de cámara en vivo
 
-En el bucle de pointing real (`src/modules/grounding/grounding.js`,
-`BoardGrounding.project()`), justo después de obtener el resultado:
+Este repositorio no incluye captura de cámara ni detección de hacia dónde apunta alguien —
+solo el análisis de las diapositivas y la lógica de comparación. Si ya tienes, por tu lado, un
+punto normalizado `(xn, yn)` sobre la diapositiva activa (de donde sea que venga: una cámara
+calibrada, un puntero, lo que sea), el encaje sería así:
 
 ```javascript
 import { PointedElementTracker } from './pointing_lookup.js';
 import { PointingIntervalLogger } from './interval_logger.js';
 
 const tracker = new PointedElementTracker();
-const sessionLog = new PointingIntervalLogger();       // para el módulo de voz de tu compañero
-const videoStartMs = performance.now();                // origen de tiempo acordado con él
+const sessionLog = new PointingIntervalLogger();       // p.ej. para cruzar con audio/voz
+const sessionStartMs = performance.now();              // origen de tiempo acordado
 const analisisPPT = await fetch('analisis_ppt.json').then(r => r.json());
-let currentSlideIndex = 0;  // se actualiza cuando el profesor cambia de diapositiva
+let currentSlideIndex = 0;  // se actualiza cuando cambia la diapositiva activa
 
-// dentro del bucle de render, cada frame:
-const result = boardGrounding.project(pointingResult, canvasWidth, canvasHeight, corners);
-if (result) {
-  const elemento = tracker.update(
-    result.smoothed.x, result.smoothed.y,
-    analisisPPT[currentSlideIndex]?.detections ?? []
-  );
-  // elemento?.class -> "Diagram", "Table", "Title"... o null
+// en cada frame / actualización, con (xn, yn) ya calculado por tu propio sistema:
+const elemento = tracker.update(xn, yn, analisisPPT[currentSlideIndex]?.detections ?? []);
+// elemento?.class -> "Diagram", "Table", "Title"... o null
 
-  const elapsedSec = (performance.now() - videoStartMs) / 1000;
-  sessionLog.update(elapsedSec, currentSlideIndex, elemento);
-}
+const elapsedSec = (performance.now() - sessionStartMs) / 1000;
+sessionLog.update(elapsedSec, currentSlideIndex, elemento);
 
 // al terminar la sesión (o para exportar bajo demanda):
 sessionLog.finish(elapsedSec);
-const csv = sessionLog.toCSV();  // -> entregar a quien cruce esto con sus timestamps de voz
+const csv = sessionLog.toCSV();
 ```
 
-Ninguna de estas llamadas toca Gemini — todo el coste de red ya se pagó
-antes de clase, en `batch_analyze.py`.
+Ninguna de estas llamadas toca Gemini — todo el coste de red ya se pagó antes, en
+`batch_analyze.py` / `serve_visual_test.py`.
 
-## Limitaciones ya conocidas (documentadas también en la conversación)
+## Limitaciones conocidas
 
-- Solo sirve para contenido **conocido de antemano** (un PPT ya cargado).
-  Para pizarra física o contenido improvisado hace falta el enfoque
-  complementario de análisis bajo demanda + caché por cambio detectado
-  (no implementado aquí).
-- Requiere que el punto de pointing (`xn, yn`) y las cajas de Gemini
-  compartan el mismo sistema de coordenadas — solo se garantiza si la
-  imagen usada para calibrar el plano rectificado es la misma que se envió
-  a Gemini (ver la explicación de este problema en la conversación).
-- Se ha observado alguna vez, en pruebas con imágenes reales, una caja que
-  se sale ligeramente de `[0,1]` — inofensivo para la comparación (un punto
-  de pointing nunca supera 1), pero recordatorio de que Gemini no es
-  perfectamente preciso ni siquiera en el propio formato de salida.
-- Las cajas de Gemini pueden ser imprecisas (demasiado grandes, mal
-  ajustadas al contenido real) de forma no determinista — ver la discusión
-  extensa sobre esto en la conversación. Cambiar de modelo (Flash, 2.5 Pro,
-  3.1 Pro) no lo soluciona de forma fiable; cada uno falla de una manera
-  distinta en los mismos casos difíciles.
+- Solo sirve para contenido **conocido de antemano** (un PDF/PPT ya cargado y analizado) — no
+  para pizarra física o contenido improvisado.
+- Requiere que el punto `(xn, yn)` y las cajas de Gemini compartan el mismo sistema de
+  coordenadas normalizado `[0,1]²` respecto a la diapositiva: solo se garantiza si la imagen
+  usada para calcular ese punto es exactamente la misma que se envió a Gemini (misma relación
+  de aspecto, sin recortes ni barras negras).
+- Se ha observado, en pruebas con imágenes reales, alguna caja que se sale ligeramente de
+  `[0,1]` — inofensivo para la comparación (un punto de pointing nunca supera 1), pero
+  recordatorio de que Gemini no es perfectamente preciso ni siquiera en su propio formato de
+  salida.
+- Las cajas de Gemini pueden ser imprecisas (demasiado grandes, mal ajustadas al contenido
+  real) de forma no determinista; cambiar de modelo no lo soluciona de forma fiable — cada uno
+  falla de una manera distinta en los mismos casos difíciles.
