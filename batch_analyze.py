@@ -41,16 +41,24 @@ GEMINI_CLASSES = [
     'Chart', 'Diagram', 'Code', 'Figure-Caption', 'Table-Caption', 'Logo',
     'Footer-Element', 'SlideNr', 'URL', 'Natural-Image',
 ]
-GEMINI_PROMPT = f"""Analiza esta diapositiva de una presentacion academica de Ingenieria.
-Detecta TODAS las regiones visuales que pertenezcan a alguna de estas categorias:
+GEMINI_PROMPT = f"""Analiza esta diapositiva de una presentación académica de Ingeniería.
+Escanea visualmente el documento metódicamente de arriba a abajo y de izquierda a derecha.
+
+Detecta TODAS las regiones visuales que pertenezcan a alguna de estas categorías:
 {', '.join(GEMINI_CLASSES)}
 
-Devuelve UNICAMENTE un JSON valido (sin texto adicional, sin bloques markdown),
-una lista de objetos con este formato exacto:
-[{{"box_2d": [ymin, xmin, ymax, xmax], "label": "categoria"}}]
+Para cada región detectada, debes extraer sus coordenadas espaciales exactas usando el formato [ymin, xmin, ymax, xmax].
+Las coordenadas deben estar normalizadas en una escala de 0 a 1000, donde [0, 0] es la esquina superior izquierda de la diapositiva y [1000, 1000] es la esquina inferior derecha.
 
-box_2d normalizado a una escala 0-1000 respecto al ancho/alto completos de la imagen.
-label debe ser exactamente una de las categorias listadas arriba."""
+Devuelve ÚNICAMENTE un arreglo JSON válido (sin formato Markdown). Sigue exactamente esta estructura:
+[
+  {{
+    "descripcion": "Breve descripción del elemento para fijar la atención visual",
+    "label": "categoria_exacta",
+    "box_2d": [150, 50, 450, 900]
+  }}
+]"""
+
 
 # ── Nivel 2 — cascada sobre las cajas Diagram/Chart de Nivel 1 ────────────────
 # 28 categorias literales de DocFigure (Jobin, Mondal y Jawahar, ICDARW 2019)
