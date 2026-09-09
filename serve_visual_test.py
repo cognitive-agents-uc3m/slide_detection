@@ -34,7 +34,7 @@ APP_DIR = Path(__file__).parent
 
 GEMINI_PROJECT_ID = os.environ.get('GEMINI_PROJECT_ID')
 GEMINI_LOCATION = os.environ.get('GEMINI_LOCATION', 'global')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.6-flash')
 
 GEMINI_CLASSES = [
     'Title', 'Heading', 'Description', 'Enumeration', 'Equation', 'Table',
